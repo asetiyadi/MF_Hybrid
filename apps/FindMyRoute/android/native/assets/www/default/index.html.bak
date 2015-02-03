@@ -1,0 +1,324 @@
+<!DOCTYPE HTML>
+<html>
+   	<head>
+   		<meta charset="UTF-8">
+   		<title>Find My Route</title>
+   		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=0">
+   		<!--
+   			<link rel="shortcut icon" href="images/favicon.png">
+   			<link rel="apple-touch-icon" href="images/apple-touch-icon.png"> 
+   		-->
+   		
+   		<style type="text/css">
+            html
+            {
+                height: 100%;
+            }
+            body
+            {
+                height: 100%;
+                margin: 0;
+                padding: 0;
+            }
+            #map-canvas
+            {
+            	height:100%;
+            }
+        </style>
+   		
+   		<link rel="stylesheet" href="http://code.jquery.com/mobile/1.4.5/jquery.mobile-1.4.5.min.css" />
+		<script src="http://code.jquery.com/jquery-1.11.1.min.js"></script>
+		<script src="http://code.jquery.com/mobile/1.4.5/jquery.mobile-1.4.5.min.js"></script>
+		
+		<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.2/css/bootstrap.min.css">
+		<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.2/css/bootstrap-theme.min.css">
+		<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.2/js/bootstrap.min.js"></script>
+		
+   		<link rel="stylesheet" href="css/main.css">
+   		
+   		<script type="text/javascript" src="https://maps.googleapis.com/maps/api/js"></script>
+   		
+		
+   		<script>
+	   		var directionSvc = new google.maps.DirectionsService();
+			var directionDisplay;
+			var map;
+
+			console.info("INFO LOGGING: " + $("#origin").val());
+   			console.log("LOG DETECTED");
+
+   			$(document).on('pageinit pageshow', 'div:jqmData(role="page")', function(event) {
+   				console.log("LOG-PAGECREATED COMPLETE: " + $("#origin").val());
+   				console.info("PAGECREATED COMPLETE");
+   				
+   				hideMapNavigation();
+   				
+   				var stopOverCnt = 1;
+				
+				console.info("window - width = " + $(window).width() + " | height = " + $(window).height());	
+				console.info("map-canvas - width = " + $("#map-canvas").width() + " | height = " + $("#map-canvas").height());
+					
+				
+   				
+   				$("#origin").blur(function(event) {
+   					getLatLng();
+   					console.info("PAGESHOW-ONBLUR DETECTED");
+   				});
+   				
+   				$("#btnRoute").click(function(event) {
+   					calculateRoute();
+   				});
+   				
+   				$("#btnHome").click(function() {
+   					hideMapNavigation();
+   				});
+   				
+   				$("#btnAdd").unbind("click").bind("click", function() {
+   					console.info("ADD BUTTON IS CLICKED");
+   					if(stopOverCnt > 5) {
+   						alert("You have reached the maximum stop over for this trip");
+   						return false;
+   					} 
+   					
+   					//<input type="text" class="form-control" id="stopOver1" name="stopOver1" value="Lafayette, CO" size="10">
+   					stopOverCnt++;
+   					var newSoDiv = $(document.createElement("div")).attr("id", "soDiv" + stopOverCnt);
+   					
+   					newSoDiv.after().html('<input type="text" class="form-control" id="stopOver'+stopOverCnt+'" name="stopOver'+stopOverCnt+'">');
+   					console.info("NEWSODIV:" + newSoDiv.html());
+   					newSoDiv.appendTo("#stopOvers");
+   					
+   					$("#numStopOver").val(stopOverCnt);
+   				});
+   				
+   				$("#btnRefresh").on("click", function() {
+   					while(stopOverCnt > 1) {
+   						$("#soDiv" + stopOverCnt).remove();
+   						stopOverCnt--;
+   					}
+   				});
+   				
+   				var getLatLng = function() {
+   					var origin = $("#origin").val();
+   					console.info("jOrigin = " + origin);
+
+   					var url = "https://maps.googleapis.com/maps/api/geocode/json?address=" + origin
+   					var output;
+
+   					$.ajax({
+   						type: "GET",
+   						url: url,
+   						success: parseResults
+   					})
+
+   					function parseResults(data) {
+   						console.info(JSON.stringify(data.results));
+   						output = {
+   							"lat": 0,
+   							"lng": 0
+   						}
+   						$("#originLat").val(data.results[0].geometry.location.lat);
+   						$("#originLng").val(output.lng = data.results[0].geometry.location.lng);
+   					}	
+   				}
+   				
+   				var calculateRoute = function() {
+   					showMapNavigation();
+   					
+   					//$("#map-canvas").height($(window).height()*0.85);
+					$("#map-canvas").width($(window).width()*0.92);
+					$("#map-canvas").css("padding-top", "30px");
+   					
+					directionDisplay = new google.maps.DirectionsRenderer();
+					
+					var options = {
+						center: new google.maps.LatLng($("#originLat").val(), $("#originLng").val()),
+						zoom: 10,
+						mapTypeId: google.maps.MapTypeId.ROADMAP
+					};
+					
+					map = new google.maps.Map(document.getElementById("map-canvas"), options);
+					directionDisplay.setMap(map);
+   					
+   					setTimeout(function() {
+   	   					google.maps.event.trigger(map, 'resize');
+   	   				},500);
+   					
+   					var origin = $("#origin").val();
+   					var destination = $("#destination").val();
+   					var stopOver = [];
+   					
+   					console.info("numStopOver.val() = " + $("#numStopOver").val());
+   					for(var x=1; x<=$("#numStopOver").val(); x++) {
+   						
+   						if($("#stopOver"+x).val() != "") {
+   							console.info(x + "=" + $("#stopOver"+x).val());
+   							stopOver.push({
+   								location: $("#stopOver"+x).val(), 
+   								stopover: true
+   							});
+   						}
+   					}
+
+   					var request = {
+   						origin: origin,
+   						destination: destination,
+   						waypoints: stopOver,
+   						optimizeWaypoints: true,
+   						travelMode: google.maps.TravelMode.DRIVING
+   					};
+
+   					directionSvc.route(request, function(response, status) {
+   						if(status == google.maps.DirectionsStatus.OK) {
+   							directionDisplay.setDirections(response);
+
+   							var route = response.routes[0];
+
+   							//console.log("ROUTE: " + JSON.stringify(route));
+
+   							var summaryPanel = ""
+   							
+   							for(var y=0; y < route.legs.length; y++) {
+   								console.info("route.legs[y].start_address = " + route.legs[y].start_address);
+   								var routeSegment = y + 1;
+   								summaryPanel += '<b>Route Segment: ' + routeSegment + '</b><br/>';
+   								summaryPanel += route.legs[y].start_address + " to ";
+   								summaryPanel += route.legs[y].end_address + "<br/>";
+   								summaryPanel += route.legs[y].distance.text + "<br/><br/>";
+   							}
+
+   							$("#directions_panel").html(summaryPanel);
+   						}
+   					});
+   					
+   					
+   				}
+   			});
+   			
+   			/*
+   			$("document").on("pageshow", "#mapDisplay", function() {
+   				console.info("MAPDISPLAY - PAGESHOW");	
+   				setTimeout(function() {
+   					google.maps.event.trigger(map, 'resize');
+   				},500);
+   			});
+   			*/
+   			
+   		  	var hideMapNavigation = function() {
+   				$("#map-canvas").hide();
+   				$("#btnHome").hide();
+   				$("#btnDirection").hide();
+   				$("#startEndPoint").show();
+   			}		
+   			
+   			var showMapNavigation = function() {
+   				$("#map-canvas").show();
+   				$("#btnHome").show();
+   				$("#btnDirection").show();
+   				$("#startEndPoint").hide();
+   			}
+
+   		/*function refreshPage()
+   		{
+   		    jQuery.mobile.changePage(window.location.href, {
+   		        allowSamePageTransition: true,
+   		        transition: 'none',
+   		        reloadPage: true
+   		    });
+   		}*/
+   			/*$(document).on("pagecreate", "#page", function() {
+   				console.log("LOG-PAGECREATED COMPLETE");
+   				console.info("PAGECREATED COMPLETE");
+   				$("#origin").blur(function(event) {
+   					$("#origin").val("ONBLUR DETECTED");
+   					console.info("PAGECREATE-ONBLUR DETECTED");
+   				});
+   			});*/
+   		</script>
+   		
+	</head>
+   	<body>
+   		
+   		<div data-role="page" id="page">
+   			<div data-role="header">
+	   			<button type="button" id="btnHome" value="HOME" class="btn btn-sm">
+					<span class="glyphicon glyphicon-home"></span>
+				</button>
+	   			<h1>FIND MY ROUTE</h1>
+	   			<button type="button" id="btnDirection" value="DIRECTION" class="btn btn-sm">
+					<span class="glyphicon glyphicon-road"></span>
+				</button>
+	   		</div>
+	   		
+	   
+   			<div data-role="content" class="ui-content" id="map-canvas">
+   				  
+   				
+   				
+   			</div>
+   			<!-- <div id="directions_panel" style="margin:20px;background-color:#FFEE77;"></div> -->
+	   		
+	   		
+   			<div data-role="content" class="ui-content" id="startEndPoint">
+				<form>
+					<div class="form-group">
+						<label for="origin">Origin</label>
+						<input type="text" class="form-control" id="origin" name="origin" placeholder="Enter the starting address">
+					</div>
+					<div class="form-group">
+						<label for="destination">Destination</label>
+						<input type="text" class="form-control" id="destination" name="destination" placeholder="Enter the final destination">
+					</div>
+					<div class="form-group">
+						<label for="destination">Stop Overs</label>
+						<div id="stopOvers">
+							<div id="soDiv1">
+								<input type="text" class="form-control" id="stopOver1" name="stopOver1">
+							</div>
+							<!-- 
+							<div id="soDiv2">
+								<input type="text" class="form-control" id="stopOver2" name="stopOver2" value="Louisville, CO">
+							</div>
+							 -->
+						</div>
+						<div>
+							<button id="btnAdd" type="button" class="btn btn-link">Add More Stop</button>
+						</div>
+						<!--
+						
+						<input type="text" class="form-control" id="stopOver3" name="stopOver3" value="Westminster, CO"><span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
+						<input type="text" class="form-control" id="stopOver4" name="stopOver4" value="Northglenn, CO"><span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
+						<input type="text" class="form-control" id="stopOver5" name="stopOver5" value="Thornton, CO"><span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
+						-->
+					</div>
+					<div>
+						<input type="button" id="btnRefresh" class="btn btn-primary" value="Reset">
+						<input type="button" id="btnRoute" class="btn btn-primary" value="Find My Route">
+						<input type="hidden" id="originLat" name="originLat">
+						<input type="hidden" id="originLng" name="originLng">
+						<input type="hidden" id="numStopOver" name="numStopOver" value="1"/>
+					</div>
+				</form>
+			</div>
+			
+			<div id="footer" data-role="footer" data-position="fixed">
+				
+				
+				
+			</div> 
+   		</div>
+   		<!-- 
+   		<div data-role="page" id="mapDisplay">
+   			<div role="main" class="ui-content" id="map-canvas">
+   				  
+   				<div id="map-canvas"></div>
+   				<div id="directions_panel" style="margin:20px;background-color:#FFEE77;"></div>
+   				   			</div>
+   			
+   		</div>
+   		-->
+   		<script src="js/initOptions.js"></script>
+   		<script src="js/main.js"></script>
+   		<script src="js/messages.js"></script>
+   	</body>
+</html>

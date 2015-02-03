@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?><project-modules id="moduleCoreId" project-version="1.5.0">
+    <wb-module deploy-name="MF_Hybrid">
+        <wb-resource deploy-path="/" source-path="/apps/FindMyRoute/common"/>
+        <wb-resource deploy-path="/" source-path="/apps/FindMyRoute/android"/>
+        <property name="context-root" value="MF_Hybrid"/>
+    </wb-module>
+</project-modules>
